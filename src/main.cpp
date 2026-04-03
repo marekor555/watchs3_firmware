@@ -1,0 +1,147 @@
+#include <Arduino.h>
+#include <SensorPCF85063.hpp>
+#include <TouchDrvFT6X36.hpp>
+#include <XPowersLib.h>
+#include <Arduino_GFX_Library.h>
+#include <Fonts/FreeMono9pt7b.h>
+#include "button.h"
+#include "pin_config.h"
+
+Arduino_ESP32QSPI bus(
+	LCD_CS /* CS */, LCD_SCLK /* SCK */, LCD_SDIO0 /* SDIO0 */, LCD_SDIO1 /* SDIO1 */,
+	LCD_SDIO2 /* SDIO2 */, LCD_SDIO3 /* SDIO3 */);
+
+Arduino_CO5300 display(&bus, LCD_RESET /* RST */,
+						0 /* rotation */, LCD_WIDTH, LCD_HEIGHT,
+						22 /* col_offset1 */,
+						0 /* row_offset1 */,
+						0 /* col_offset2 */,
+						0 /* row_offset2 */);
+
+XPowersAXP2101 PMU;
+SensorPCF85063 rtc;
+TouchDrvFT6X36 touch;
+
+
+
+constexpr int btnWidth = 54 * 2;
+constexpr int btnHeight = 60;
+constexpr int totalGap = LCD_WIDTH - btnWidth * 3;
+constexpr int gap = totalGap / 4;
+constexpr int btnAppsHeight = 60;
+
+Button buttonHour(gap, LCD_WIDTH / 2 - btnHeight / 2 + 28, btnWidth, btnHeight, "", 4, &display);
+Button buttonMinute(gap * 2 + btnWidth, LCD_WIDTH / 2 - btnHeight / 2 + 28, btnWidth, btnHeight, "", 4, &display);
+Button buttonSecond(gap * 3 + btnWidth * 2, LCD_WIDTH / 2 - btnHeight / 2 + 28, btnWidth, btnHeight, "", 4, &display);
+Button buttonApps(0, LCD_HEIGHT - (btnAppsHeight), LCD_WIDTH, btnAppsHeight, "Apps", 3, &display);
+
+int selectedOption = 0;
+bool displayOn = true, redraw = true;
+float lastTimeUpdate = 0;
+RTC_DateTime now;
+
+void setup() {
+	pinMode(BTN_TOP, INPUT);
+	pinMode(BTN_DOWN, INPUT);
+
+	Wire.begin(IIC_SDA, IIC_SCL);
+
+	if (!rtc.begin(Wire, IIC_SDA, IIC_SCL)) {
+		while (1);
+	}
+
+	if (!PMU.begin(Wire, 0x34, IIC_SDA, IIC_SCL)) {
+		while (1);
+	}
+
+	PMU.setALDO1Voltage(1800);
+	PMU.enableALDO1();
+
+	PMU.setALDO2Voltage(3300);
+	PMU.enableALDO2();
+
+	PMU.setBLDO1Voltage(3300);
+	PMU.enableBLDO1();
+
+	if (!touch.begin(Wire, 0x38)) {
+		while (1);
+	}
+
+	display.begin();
+
+	display.displayOn();
+	display.setFont(&FreeMono9pt7b);
+	display.fillScreen(RGB565_BLACK);
+	rtc.start();
+	now = rtc.getDateTime();
+	lastTimeUpdate = millis();
+	while (digitalRead(BTN_DOWN));
+}
+
+void addTime(const int hour, const int minute, const int second) {
+	const RTC_DateTime now = rtc.getDateTime();
+	rtc.setDateTime(0, 0, 0,
+					(now.getHour() + hour) % 24,
+					(now.getMinute() + minute) % 60,
+					(now.getSecond() + second) % 60
+	);
+	redraw = true;
+}
+
+void loop() {
+	if (millis()-lastTimeUpdate > 1000 || redraw) {
+		now = rtc.getDateTime();
+		lastTimeUpdate = millis();
+		if (selectedOption == 1) buttonHour.color = RGB565_NAVY;
+		else buttonHour.color = RGB565_DIMGRAY;
+		buttonHour.draw(String(now.getHour()));
+
+		if (selectedOption == 2) buttonMinute.color = RGB565_NAVY;
+		else buttonMinute.color = RGB565_DIMGRAY;
+		buttonMinute.draw(String(now.getMinute()));
+
+		if (selectedOption == 3) buttonSecond.color = RGB565_NAVY;
+		else buttonSecond.color = RGB565_DIMGRAY;
+		buttonSecond.draw(String(now.getSecond()));
+
+		buttonApps.draw();
+		redraw = false;
+	}
+
+	display.setTextColor(RGB565_WHITESMOKE, RGB565_BLACK);
+	display.setTextSize(2);
+	display.setCursor(70, 40);
+	if (PMU.isCharging()) {
+		display.printf("CHARGING ");
+	} else {
+		display.printf("BAT:%d", PMU.getBatteryPercent());
+		display.print("%  ");
+	}
+	display.println();
+
+	TouchPoints points = touch.getTouchPoints();
+	const int lastSelectedOpt = selectedOption;
+	if (buttonHour.isPressed(points)) selectedOption = selectedOption == 1 ? 0 : 1;
+	if (buttonMinute.isPressed(points)) selectedOption = selectedOption == 2 ? 0 : 2;
+	if (buttonSecond.isPressed(points)) selectedOption = selectedOption == 3 ? 0 : 3;
+	if (lastSelectedOpt != selectedOption) redraw = true;
+	if (points.getPointCount() > 0) {
+		const TouchPoint point = points.getPoint(0);
+		int val = 0;
+		if (point.y < display.height() / 2 - btnHeight) val = 1;
+		else if (point.y > display.height() / 2 + btnHeight) val = -1;
+
+		if (selectedOption == 1) addTime(val, 0, 0);
+		else if (selectedOption == 2) addTime(0, val, 0);
+		else if (selectedOption == 3) addTime(0, 0, val);
+
+		while (points.getPointCount() > 0) points = touch.getTouchPoints();
+	}
+
+	if (digitalRead(BTN_DOWN)) {
+		if (selectedOption == 0) {
+			display.displayOff();
+			PMU.shutdown();
+		}
+	}
+}
