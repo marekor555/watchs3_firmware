@@ -6,6 +6,7 @@
 #include <Fonts/FreeMono9pt7b.h>
 #include "button.h"
 #include "pin_config.h"
+#include "apps.h"
 
 Arduino_ESP32QSPI bus(
 	LCD_CS /* CS */, LCD_SCLK /* SCK */, LCD_SDIO0 /* SDIO0 */, LCD_SDIO1 /* SDIO1 */,
@@ -125,7 +126,7 @@ void loop() {
 	if (buttonMinute.isPressed(points)) selectedOption = selectedOption == 2 ? 0 : 2;
 	if (buttonSecond.isPressed(points)) selectedOption = selectedOption == 3 ? 0 : 3;
 	if (lastSelectedOpt != selectedOption) redraw = true;
-	if (points.getPointCount() > 0) {
+	if (points.getPointCount() > 0 && selectedOption != 0) {
 		const TouchPoint point = points.getPoint(0);
 		int val = 0;
 		if (point.y < display.height() / 2 - btnHeight) val = 1;
@@ -136,6 +137,33 @@ void loop() {
 		else if (selectedOption == 3) addTime(0, 0, val);
 
 		while (points.getPointCount() > 0) points = touch.getTouchPoints();
+	}
+	if (buttonApps.isPressed(points)) {
+		while (points.getPointCount() > 0) points = touch.getTouchPoints();
+		Button btnCalc(20, 20, LCD_WIDTH-40, btnHeight, "Calculator", 3, &display);
+		Button btnExit(0, LCD_HEIGHT-btnHeight, LCD_WIDTH, btnAppsHeight, "Back", 3, &display);
+		display.fillRect(0, 0, LCD_WIDTH, LCD_HEIGHT-btnHeight, RGB565_BLACK);
+		btnCalc.draw();
+		btnExit.draw();
+		bool redraw_ = false;
+		while (true) {
+			if (redraw_) {
+				display.fillScreen(RGB565_BLACK);
+				btnCalc.draw();
+				btnExit.draw();
+				redraw_ = false;
+			}
+			points = touch.getTouchPoints();
+			if (btnCalc.isPressed(points)) {
+				calc(&display, &touch);
+				redraw_ = true;
+			}
+			if (btnExit.isPressed(points)) break;
+			while (points.getPointCount() > 0) points = touch.getTouchPoints();
+		}
+		while (points.getPointCount() > 0) points = touch.getTouchPoints();
+		display.fillRect(0, 0, LCD_WIDTH, LCD_HEIGHT-btnHeight, RGB565_BLACK);
+		redraw = true;
 	}
 
 	if (digitalRead(BTN_DOWN)) {
