@@ -26,7 +26,7 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 
 	for (int row = 0; row < 5; row++) {
 		for (int col = 0; col < 4; col++) {
-			kb[row][col] = Button(gap * (col + 1) + btn_width * col, kb_offset + gap * (row + 1) + btn_height * row,
+			kb[row][col].init(gap * (col + 1) + btn_width * col, kb_offset + gap * (row + 1) + btn_height * row,
 								btn_width, btn_height, layout[row][col], 3, display);
 			kb[row][col].draw();
 		}
@@ -38,6 +38,10 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 	auto *textCanvas = new Arduino_Canvas(LCD_WIDTH, kb_offset, display);
 	textCanvas->begin(GFX_SKIP_OUTPUT_BEGIN);
 	textCanvas->setTextSize(4);
+	textCanvas->fillScreen(RGB565_BLACK);
+	textCanvas->setCursor(40, 60);
+	textCanvas->print(result);
+	textCanvas->flush();
 	while (true) {
 		TouchPoints points = touch->getTouchPoints();
 		String pressedBtn = "";
@@ -47,11 +51,7 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 			}
 		}
 		if (pressedBtn == "EX") {
-			for (auto &row: kb) {
-				for (const auto &col: row) {
-					col.obliterate();
-				}
-			}
+			delete textCanvas;
 			return;
 		}
 		if (pressedBtn != "") {
@@ -89,17 +89,15 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 			}
 
 			if (update) {
-				if (abs(resultDouble - static_cast<long>(resultDouble)) < 1e-4) {
-					result = String(static_cast<long>(resultDouble));
-				} else {
-					result = String(resultDouble);
-				}
+				char buffer[32];
+				snprintf(buffer, 32, "%.10g", resultDouble);
+				result = String(buffer);
 			}
-			while (points.getPointCount() > 0) points = touch->getTouchPoints();
 			textCanvas->fillScreen(RGB565_BLACK);
 			textCanvas->setCursor(40, 60);
 			textCanvas->print(result);
 			textCanvas->flush();
+			while (points.getPointCount() > 0) points = touch->getTouchPoints();
 		}
 	}
 }

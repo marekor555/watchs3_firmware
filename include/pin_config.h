@@ -21,10 +21,15 @@
 #define TP_RESET 9
 
 // SD
-#define SDMMC_CLK = 2;
-#define SDMMC_CMD = 1;
-#define SDMMC_DATA = 3;
-#define SDMMC_CS = 17;
+#define SD_MOSI 1
+#define SD_SCK 2
+#define SD_MISO 3
+#define SD_CS 17
+
+// ES8311
+#define I2S_MCLK 16
+#define I2S_SCLK 41
+
 
 #define BTN_TOP 0
 #define BTN_DOWN 10

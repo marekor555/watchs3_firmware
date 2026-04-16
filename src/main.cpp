@@ -4,6 +4,7 @@
 #include <XPowersLib.h>
 #include <Arduino_GFX_Library.h>
 #include <Fonts/FreeMono9pt7b.h>
+#include <SD.h>
 #include "button.h"
 #include "pin_config.h"
 #include "apps.h"
@@ -55,13 +56,13 @@ void setup() {
 		while (1);
 	}
 
-	PMU.setALDO1Voltage(1800);
+	PMU.setALDO1Voltage(3400);
 	PMU.enableALDO1();
 
-	PMU.setALDO2Voltage(3300);
+	PMU.setALDO2Voltage(3400);
 	PMU.enableALDO2();
 
-	PMU.setBLDO1Voltage(3300);
+	PMU.setBLDO1Voltage(3400);
 	PMU.enableBLDO1();
 
 	if (!touch.begin(Wire, 0x38)) {
@@ -71,11 +72,13 @@ void setup() {
 	display.begin();
 
 	display.displayOn();
+	display.setBrightness(140);
 	display.setFont(&FreeMono9pt7b);
 	display.fillScreen(RGB565_BLACK);
 	rtc.start();
 	now = rtc.getDateTime();
 	lastTimeUpdate = millis();
+
 	while (digitalRead(BTN_DOWN));
 }
 
@@ -140,22 +143,29 @@ void loop() {
 	}
 	if (buttonApps.isPressed(points)) {
 		while (points.getPointCount() > 0) points = touch.getTouchPoints();
-		Button btnCalc(20, 20, LCD_WIDTH-40, btnHeight, "Calculator", 3, &display);
+		Button btnCalc(20, 50, LCD_WIDTH-40, btnHeight, "Calculator", 3, &display);
+		Button btnMusic(20, 50+btnHeight+10, LCD_WIDTH-40, btnHeight, "Music", 3, &display);
 		Button btnExit(0, LCD_HEIGHT-btnHeight, LCD_WIDTH, btnAppsHeight, "Back", 3, &display);
 		display.fillRect(0, 0, LCD_WIDTH, LCD_HEIGHT-btnHeight, RGB565_BLACK);
 		btnCalc.draw();
+		btnMusic.draw();
 		btnExit.draw();
 		bool redraw_ = false;
 		while (true) {
 			if (redraw_) {
 				display.fillScreen(RGB565_BLACK);
 				btnCalc.draw();
+				btnMusic.draw();
 				btnExit.draw();
 				redraw_ = false;
 			}
 			points = touch.getTouchPoints();
 			if (btnCalc.isPressed(points)) {
 				calc(&display, &touch);
+				redraw_ = true;
+			}
+			if (btnMusic.isPressed(points)) {
+				music(&display, &touch);
 				redraw_ = true;
 			}
 			if (btnExit.isPressed(points)) break;
