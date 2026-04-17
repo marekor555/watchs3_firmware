@@ -3,15 +3,16 @@
 #include <TouchDrvFT6X36.hpp>
 #include <XPowersLib.h>
 #include <Arduino_GFX_Library.h>
-#include <Fonts/FreeMono9pt7b.h>
-#include <SD.h>
+#include <SD_MMC.h>
+#include <AudioBoard.h>
+#include <Audio.h>
 #include "button.h"
 #include "pin_config.h"
 #include "apps.h"
 
 Arduino_ESP32QSPI bus(
 	LCD_CS /* CS */, LCD_SCLK /* SCK */, LCD_SDIO0 /* SDIO0 */, LCD_SDIO1 /* SDIO1 */,
-	LCD_SDIO2 /* SDIO2 */, LCD_SDIO3 /* SDIO3 */);
+	LCD_SDIO2 /* SDIO2 */, LCD_SDIO3 /* SDIO3 */, true);
 
 Arduino_CO5300 display(&bus, LCD_RESET /* RST */,
 						0 /* rotation */, LCD_WIDTH, LCD_HEIGHT,
@@ -23,8 +24,10 @@ Arduino_CO5300 display(&bus, LCD_RESET /* RST */,
 XPowersAXP2101 PMU;
 SensorPCF85063 rtc;
 TouchDrvFT6X36 touch;
-
-
+Audio audio;
+AudioDriverES8311Class driver;
+DriverPins pins;
+AudioBoard board(driver, pins);
 
 constexpr int btnWidth = 54 * 2;
 constexpr int btnHeight = 60;
@@ -56,28 +59,60 @@ void setup() {
 		while (1);
 	}
 
-	PMU.setALDO1Voltage(3400);
+	PMU.setALDO1Voltage(3300);
 	PMU.enableALDO1();
 
 	PMU.setALDO2Voltage(3400);
 	PMU.enableALDO2();
 
+	PMU.setALDO3Voltage(3300);
+	PMU.enableALDO3();
+
+	PMU.setALDO4Voltage(3300);
+	PMU.enableALDO4();
+
 	PMU.setBLDO1Voltage(3400);
 	PMU.enableBLDO1();
+
+	delay(200);
 
 	if (!touch.begin(Wire, 0x38)) {
 		while (1);
 	}
 
-	display.begin();
+	display.begin(80000000);
 
 	display.displayOn();
 	display.setBrightness(140);
-	display.setFont(&FreeMono9pt7b);
 	display.fillScreen(RGB565_BLACK);
+	display.setCursor(40, 40);
+	display.setTextSize(3);
+
 	rtc.start();
 	now = rtc.getDateTime();
 	lastTimeUpdate = millis();
+
+
+	SD_MMC.setPins(SDMMC_CLK, SDMMC_CMD, SDMMC_DATA);
+	if (!SD_MMC.begin("/sdcard", true)) {
+		display.println("FAILED TO INIT SDMMC");
+		while (1);
+	}
+	pinMode(46, OUTPUT);
+	digitalWrite(46, HIGH);
+	pins.addI2C(PinFunction::CODEC, 14, 15);
+	pins.addPin(PinFunction::PA, 46, PinLogic::Output);
+
+	if (!board.begin()) {
+		display.println("FAILED TO INIT AUDIO");
+		while (1);
+	}
+	board.setVolume(100);
+	board.setPAPower(true);
+	board.setMute(false);
+	audio.setPinout(41, 45, 42, 40, -1);
+	audio.setVolume(21);
+	audio.forceMono(true);
 
 	while (digitalRead(BTN_DOWN));
 }
@@ -114,7 +149,7 @@ void loop() {
 
 	display.setTextColor(RGB565_WHITESMOKE, RGB565_BLACK);
 	display.setTextSize(2);
-	display.setCursor(70, 40);
+	display.setCursor(40, 40);
 	if (PMU.isCharging()) {
 		display.printf("CHARGING ");
 	} else {
@@ -165,7 +200,7 @@ void loop() {
 				redraw_ = true;
 			}
 			if (btnMusic.isPressed(points)) {
-				music(&display, &touch);
+				music(&display, &touch, &audio);
 				redraw_ = true;
 			}
 			if (btnExit.isPressed(points)) break;

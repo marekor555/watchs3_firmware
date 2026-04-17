@@ -26,6 +26,10 @@
 #define SD_MISO 3
 #define SD_CS 17
 
+constexpr int SDMMC_CLK = 2;
+constexpr int SDMMC_CMD = 1;
+constexpr int SDMMC_DATA = 3;
+constexpr int SDMMC_CS = 17;
 // ES8311
 #define I2S_MCLK 16
 #define I2S_SCLK 41

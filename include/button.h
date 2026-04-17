@@ -23,7 +23,7 @@ public:
 	void init(int x_ = 0, int y_ = 0, int width_ = 0, int height_ = 0, String text_ = "", int textSize_ = 1,
 			Arduino_CO5300 *display = nullptr) {
 		x = x_, y = y_, width = width_, height = height_, text = text_;
-
+		delete btnCanvas;
 		if (display != nullptr && width_ > 0 && height_ > 0) {
 			btnCanvas = new Arduino_Canvas(width_, height_, display, x_, y_);
 			btnCanvas->begin(GFX_SKIP_OUTPUT_BEGIN);
