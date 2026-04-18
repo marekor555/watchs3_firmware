@@ -4,11 +4,14 @@
 #include <XPowersLib.h>
 #include <Arduino_GFX_Library.h>
 #include <SD_MMC.h>
-#include <AudioBoard.h>
-#include <Audio.h>
 #include "button.h"
 #include "pin_config.h"
 #include "apps.h"
+#include <AudioBoard.h>
+#include <AudioTools.h>
+#include <AudioTools/AudioCodecs/CodecMP3Helix.h>
+#include <AudioTools/AudioLibs/I2SCodecStream.h>
+#include <AudioTools/Disk/AudioSourceSDMMC.h>
 
 Arduino_ESP32QSPI bus(
 	LCD_CS /* CS */, LCD_SCLK /* SCK */, LCD_SDIO0 /* SDIO0 */, LCD_SDIO1 /* SDIO1 */,
@@ -24,10 +27,14 @@ Arduino_CO5300 display(&bus, LCD_RESET /* RST */,
 XPowersAXP2101 PMU;
 SensorPCF85063 rtc;
 TouchDrvFT6X36 touch;
-Audio audio;
 AudioDriverES8311Class driver;
 DriverPins pins;
-AudioBoard board(driver, pins);
+AudioBoard audioBoard(driver, pins);
+AudioSourceSDMMC source("/", "mp3");
+I2SCodecStream i2s(audioBoard);
+
+MP3DecoderHelix decoder;
+AudioPlayer player;
 
 constexpr int btnWidth = 54 * 2;
 constexpr int btnHeight = 60;
@@ -49,6 +56,7 @@ void setup() {
 	pinMode(BTN_TOP, INPUT);
 	pinMode(BTN_DOWN, INPUT);
 
+	Wire.end();
 	Wire.begin(IIC_SDA, IIC_SCL);
 
 	if (!rtc.begin(Wire, IIC_SDA, IIC_SCL)) {
@@ -98,21 +106,31 @@ void setup() {
 		display.println("FAILED TO INIT SDMMC");
 		while (1);
 	}
-	pinMode(46, OUTPUT);
-	digitalWrite(46, HIGH);
+
 	pins.addI2C(PinFunction::CODEC, 14, 15);
+	pins.addI2S(PinFunction::CODEC, 16, 41, 45, 40, 42);
 	pins.addPin(PinFunction::PA, 46, PinLogic::Output);
 
-	if (!board.begin()) {
+	if (!audioBoard.begin()) {
 		display.println("FAILED TO INIT AUDIO");
 		while (1);
 	}
-	board.setVolume(100);
-	board.setPAPower(true);
-	board.setMute(false);
-	audio.setPinout(41, 45, 42, 40, -1);
-	audio.setVolume(21);
-	audio.forceMono(true);
+
+	audioBoard.setPAPower(true);
+
+	auto cfg = i2s.defaultConfig(TX_MODE);
+	cfg.sample_rate = 44100;
+	cfg.bits_per_sample = 16;
+	cfg.channels = 2;
+
+	i2s.begin(cfg);
+	player.setAudioSource(source);
+	player.setDecoder(decoder);
+	player.setOutput(i2s);
+
+	player.setVolume(0.1);
+	player.setAutoNext(false);
+	player.begin(0, true);
 
 	while (digitalRead(BTN_DOWN));
 }
@@ -200,7 +218,7 @@ void loop() {
 				redraw_ = true;
 			}
 			if (btnMusic.isPressed(points)) {
-				music(&display, &touch, &audio);
+				music(&display, &touch, &player);
 				redraw_ = true;
 			}
 			if (btnExit.isPressed(points)) break;

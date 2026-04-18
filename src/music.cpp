@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SD_MMC.h>
-#include <Audio.h>
 #include <TouchDrvFT6X36.hpp>
 #include <Arduino_GFX_Library.h>
 #include <driver/i2s.h>
@@ -9,6 +8,10 @@
 #include "pin_config.h"
 #include <esp_log.h>
 #include <AudioBoard.h>
+#include <AudioTools.h>
+#include <AudioTools/AudioCodecs/CodecMP3Helix.h>
+#include <AudioTools/AudioLibs/I2SCodecStream.h>
+#include <AudioTools/Disk/AudioSourceSD.h>
 
 extern SPIClass sdSPI;
 
@@ -33,18 +36,25 @@ void updateButtons(Button (&Buttons)[5], const std::vector<String> &files, int c
 	}
 }
 
-void playMusic(Arduino_CO5300 *display, TouchDrvFT6X36 *touch, Audio *audio, String text) {
-	Button btnExit = Button(0, display->height()-50, display->width(), 50, "exit", 3, display);
-	audio->connecttoFS(SD_MMC, String("/sdcard/music/"+text).c_str(), 0);
+void playMusic(Arduino_CO5300 *display, TouchDrvFT6X36 *touch, AudioPlayer *player, String text) {
 	display->fillScreen(RGB565_BLACK);
+
+	
+	player->stop();
+	player->setVolume(0.01);
+	player->setPath(String("/music/"+text).c_str());
+	player->play();
+
+	Button btnExit = Button(0, display->height()-50, display->width(), 50, "exit", 3, display);
+
 	btnExit.draw();
 	uint32_t lastTouch = millis();
 	while (true) {
-		audio->loop();
+		player->copy();
 		if (millis()-lastTouch > 50) {
 			TouchPoints points = touch->getTouchPoints();
 			if (btnExit.isPressed(points)) {
-				audio->stopSong();
+				player->stop();
 				return;
 			}
 			lastTouch = millis();
@@ -52,7 +62,7 @@ void playMusic(Arduino_CO5300 *display, TouchDrvFT6X36 *touch, Audio *audio, Str
 	}
 }
 
-void music(Arduino_CO5300 *display, TouchDrvFT6X36 *touch, Audio *audio) {
+void music(Arduino_CO5300 *display, TouchDrvFT6X36 *touch, AudioPlayer *player) {
 	display->fillScreen(RGB565_BLACK);
 	display->setCursor(50,50);
 	display->setTextColor(RGB565_WHITE);
@@ -92,7 +102,7 @@ void music(Arduino_CO5300 *display, TouchDrvFT6X36 *touch, Audio *audio) {
 
 			for (int i = 0; i < 5; i++) {
 				if (!buttons[i].isPressed(points) ||  buttons[i].text == "") continue;
-				playMusic(display, touch, audio, buttons[i].text);
+				playMusic(display, touch, player, buttons[i].text);
 				display->fillScreen(RGB565_BLACK);
 				btnExit.draw();
 				for (int i = 0; i < 5; i++) {
