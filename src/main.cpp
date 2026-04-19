@@ -119,15 +119,16 @@ void setup() {
 	audioBoard.setPAPower(true);
 
 	auto cfg = i2s.defaultConfig(TX_MODE);
-	cfg.sample_rate = 44100;
+	cfg.sample_rate = 22050;
 	cfg.bits_per_sample = 16;
-	cfg.channels = 2;
+	cfg.channels = 1;
 
 	i2s.begin(cfg);
 	player.setAudioSource(source);
 	player.setDecoder(decoder);
 	player.setOutput(i2s);
 
+	audioBoard.setVolume(80);
 	player.setVolume(0.1);
 	player.setAutoNext(false);
 	player.begin(0, true);
