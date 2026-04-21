@@ -1,13 +1,15 @@
 #include <Arduino.h>
 #include <SensorPCF85063.hpp>
 #include <TouchDrvFT6X36.hpp>
-#include <XPowersLib.h>
 #include <Arduino_GFX_Library.h>
-#include <Fonts/FreeMono9pt7b.h>
 #include "button.h"
 #include "pin_config.h"
 
-void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
+
+extern Arduino_CO5300 display;
+extern TouchDrvFT6X36 touch;
+
+void calc() {
 	constexpr int kb_offset = 130;
 	constexpr int gap = 10;
 	constexpr int btn_width = (LCD_WIDTH - gap * 5) / 4;
@@ -22,12 +24,12 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 		{"0", ".", "=", "+"},
 	};
 
-	display->fillScreen(RGB565_BLACK);
+	display.fillScreen(RGB565_BLACK);
 
 	for (int row = 0; row < 5; row++) {
 		for (int col = 0; col < 4; col++) {
 			kb[row][col].init(gap * (col + 1) + btn_width * col, kb_offset + gap * (row + 1) + btn_height * row,
-								btn_width, btn_height, layout[row][col], 3, display);
+								btn_width, btn_height, layout[row][col], 3, &display);
 			kb[row][col].draw();
 		}
 	}
@@ -35,7 +37,7 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 	String result = "0";
 	double rememberedNum = 0;
 	String action = "";
-	auto *textCanvas = new Arduino_Canvas(LCD_WIDTH, kb_offset, display);
+	auto *textCanvas = new Arduino_Canvas(LCD_WIDTH, kb_offset, &display);
 	textCanvas->begin(GFX_SKIP_OUTPUT_BEGIN);
 	textCanvas->setTextSize(4);
 	textCanvas->fillScreen(RGB565_BLACK);
@@ -43,7 +45,7 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 	textCanvas->print(result);
 	textCanvas->flush();
 	while (true) {
-		TouchPoints points = touch->getTouchPoints();
+		TouchPoints points = touch.getTouchPoints();
 		String pressedBtn = "";
 		for (auto &row: kb) {
 			for (auto &col: row) {
@@ -97,7 +99,7 @@ void calc(Arduino_CO5300 *display, TouchDrvFT6X36 *touch) {
 			textCanvas->setCursor(40, 60);
 			textCanvas->print(result);
 			textCanvas->flush();
-			while (points.getPointCount() > 0) points = touch->getTouchPoints();
+			while (points.getPointCount() > 0) points = touch.getTouchPoints();
 		}
 	}
 }

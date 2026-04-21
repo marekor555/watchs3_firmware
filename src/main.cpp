@@ -55,16 +55,15 @@ RTC_DateTime now;
 void setup() {
 	pinMode(BTN_TOP, INPUT);
 	pinMode(BTN_DOWN, INPUT);
-
 	Wire.end();
 	Wire.begin(IIC_SDA, IIC_SCL);
 
 	if (!rtc.begin(Wire, IIC_SDA, IIC_SCL)) {
-		while (1);
+		while (true);
 	}
 
 	if (!PMU.begin(Wire, 0x34, IIC_SDA, IIC_SCL)) {
-		while (1);
+		while (true);
 	}
 
 	PMU.setALDO1Voltage(3300);
@@ -85,7 +84,7 @@ void setup() {
 	delay(200);
 
 	if (!touch.begin(Wire, 0x38)) {
-		while (1);
+		while (true);
 	}
 
 	display.begin(80000000);
@@ -104,7 +103,7 @@ void setup() {
 	SD_MMC.setPins(SDMMC_CLK, SDMMC_CMD, SDMMC_DATA);
 	if (!SD_MMC.begin("/sdcard", true)) {
 		display.println("FAILED TO INIT SDMMC");
-		while (1);
+		while (true);
 	}
 
 	pins.addI2C(PinFunction::CODEC, 14, 15);
@@ -113,7 +112,7 @@ void setup() {
 
 	if (!audioBoard.begin()) {
 		display.println("FAILED TO INIT AUDIO");
-		while (1);
+		while (true);
 	}
 
 	audioBoard.setPAPower(true);
@@ -137,11 +136,11 @@ void setup() {
 }
 
 void addTime(const int hour, const int minute, const int second) {
-	const RTC_DateTime now = rtc.getDateTime();
+	const RTC_DateTime current = rtc.getDateTime();
 	rtc.setDateTime(0, 0, 0,
-					(now.getHour() + hour) % 24,
-					(now.getMinute() + minute) % 60,
-					(now.getSecond() + second) % 60
+					(current.getHour() + hour) % 24,
+					(current.getMinute() + minute) % 60,
+					(current.getSecond() + second) % 60
 	);
 	redraw = true;
 }
@@ -215,11 +214,11 @@ void loop() {
 			}
 			points = touch.getTouchPoints();
 			if (btnCalc.isPressed(points)) {
-				calc(&display, &touch);
+				calc();
 				redraw_ = true;
 			}
 			if (btnMusic.isPressed(points)) {
-				music(&display, &touch, &player);
+				music();
 				redraw_ = true;
 			}
 			if (btnExit.isPressed(points)) break;
